@@ -1,8 +1,10 @@
 #[macro_use]
 extern crate clap;
-extern crate secp256k1;
+extern crate rpassword;
+extern crate sha3;
 
 use clap::App;
+use sha3::{Digest, Sha3_256};
 use std::io::{self, Write};
 use std::process;
 
@@ -16,14 +18,9 @@ fn main() {
     // Print welcome message
     println!("dpgen - A deterministic password generator\n");
     println!(
-        "Please answer the following questions. Your \
-        answers will be used to generate a strong \
-        password. No need to remember your password, \
-        you can always type the same answers into \
-        this tool later to see what your password is. \
-        \n\nWarning: Be careful not to make any typos! You will \
-        need to type the EXACT same answers if you \
-        want to regenerate the same password later!\n"
+        "Generate strong passwords for all your logins, \
+         and only remember one 'master password' to keep \
+         them all secure.\n"
     );
 
     // Get inputs
@@ -36,7 +33,27 @@ fn main() {
         process::exit(1);
     });
 
-    println!("{}@{}", username, url);
+    // Prompt for a password
+    println!("\nNow enter your 'master password'.");
+    println!(
+        "Warning: Be careful not to make any typos! You will \
+         need to type the EXACT same answers and 'master \
+         password' to recover the same password later!\n"
+    );
+    let master_pass = rpassword::prompt_password_stdout("Master password: ").unwrap();
+
+    // Concatenate inputs to create message to hash
+    let mut msg = "PASSWORD SEED = ".to_owned();
+    msg.push_str(&url.to_string());
+    msg.push_str(&username.to_string());
+    msg.push_str(&master_pass.to_string());
+
+    // Hash the message
+    let mut hasher = Sha3_256::default();
+    hasher.input(msg.as_bytes());
+    let out = hasher.result();
+
+    println!("{:x}", out);
 }
 
 fn get_input(msg: &str) -> (Result<String, String>) {
